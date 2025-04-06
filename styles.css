@@ -103,6 +103,7 @@ body {
 .message {
     max-width: 70%;
     padding: 1rem 1.2rem;
+    padding-bottom: 1.6rem;
     border-radius: var(--border-radius);
     position: relative;
     margin-bottom: 0.5rem;
@@ -120,11 +121,15 @@ body {
 }
 
 .message .timestamp {
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     position: absolute;
     bottom: 0.3rem;
-    right: 1rem;
-    opacity: 0.8;
+    right: 0.8rem;
+    opacity: 0.7;
+    font-style: italic;
+    background-color: inherit;
+    padding: 1px 4px;
+    border-radius: 4px;
 }
 
 .user-message {
@@ -204,6 +209,10 @@ body {
     box-shadow: 0 2px 5px rgba(74, 107, 255, 0.2);
 }
 
+#send-button span {
+    display: none;
+}
+
 #send-button i {
     font-size: 1.1rem;
 }
@@ -262,20 +271,26 @@ body {
 }
 
 @media (max-width: 768px) {
-    body {
-        background-color: var(--background-color) !important;
-        overflow: hidden;
-        height: 100vh;
-        position: relative;
+    html, body {
+        height: 100%;
         margin: 0;
         padding: 0;
+        overflow: hidden;
+    }
+    
+    body {
+        background-color: var(--background-color) !important;
+        position: relative;
+        display: flex;
+        flex-direction: column;
     }
     
     .chat-container {
-        margin: 0;
+        margin: 0 0 20px 0;
         height: calc(100% - 20px);
         width: 100%;
         border-radius: 0;
+        flex: 1;
     }
 
     .chat-header {
@@ -294,6 +309,13 @@ body {
     .message {
         max-width: 85%;
         padding: 0.9rem 1.1rem;
+        padding-bottom: 1.5rem;
+    }
+
+    .message .timestamp {
+        font-size: 0.6rem;
+        bottom: 0.25rem;
+        right: 0.6rem;
     }
 
     .input-container {
@@ -327,6 +349,8 @@ body {
         justify-content: center;
         box-sizing: border-box;
         margin: 0;
+        z-index: 100;
+        box-shadow: 0 -1px 2px rgba(0,0,0,0.05);
     }
 }
 
@@ -351,7 +375,14 @@ body {
     .message {
         max-width: 90%;
         padding: 0.8rem 1rem;
+        padding-bottom: 1.4rem;
         font-size: 0.95rem;
+    }
+
+    .message .timestamp {
+        font-size: 0.55rem;
+        bottom: 0.2rem;
+        right: 0.5rem;
     }
 
     .welcome-message {
@@ -430,7 +461,7 @@ body {
     opacity: 0.65; /* Setting opacity to 65% as requested */
     margin-top: 0;
     position: relative;
-    z-index: 10;
+    z-index: 50;
     background-color: var(--background-color);
 }
 

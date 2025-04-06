@@ -138,11 +138,13 @@ async function sendMessage() {
     messageInput.disabled = true;
     sendButton.disabled = true;
 
-    const timestamp = new Date().toLocaleTimeString('en-US', { 
+    // Format timestamp to be more compact
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString('en-US', { 
         hour: '2-digit', 
         minute: '2-digit',
         hour12: true 
-    });
+    }).replace(/\s/g, '').toLowerCase(); // Makes "12:30 PM" into "12:30pm"
     
     addMessage(message, true, timestamp);
     const typingIndicator = showTypingIndicator();
@@ -185,11 +187,12 @@ messageInput.focus();
 
 // Add initial welcome message
 window.addEventListener('load', () => {
-    addMessage("Hello! I'm Lucky's AI assistant. How can I help you today?", false, 
-        new Date().toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit',
-            hour12: true 
-        })
-    );
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: true 
+    }).replace(/\s/g, '').toLowerCase(); // Makes "12:30 PM" into "12:30pm"
+    
+    addMessage("Hello! I'm Lucky's AI assistant. How can I help you today?", false, timestamp);
 });
