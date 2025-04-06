@@ -1,19 +1,62 @@
-const API_KEY = "AIzaSyDJPbfw2UmiElw9xfZ8y8lIUcx96ghu5dw"; // Replace with your API key
-const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const API_KEY = "AIzaSyAAJ06nHdpAc3DdCoHXCrJ8_5izL8jO4bc"; // Replace with your API key
+const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
 const chatMessages = document.getElementById('chat-messages');
 
+// Load showdown for markdown support
+const converter = typeof showdown !== 'undefined' ? new showdown.Converter({
+    simplifiedAutoLink: true,
+    strikethrough: true,
+    tables: true,
+    tasklists: true,
+    emoji: true
+}) : null;
+
+function formatMessage(message) {
+    // Handle code blocks
+    message = message.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    
+    // Handle inline code
+    message = message.replace(/`([^`]+)`/g, '<code>$1</code>');
+    
+    // Simple URL detection
+    message = message.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+    
+    // Process markdown if showdown is available
+    if (converter) {
+        return converter.makeHtml(message);
+    }
+    
+    // Convert line breaks to <br> tags
+    return message.replace(/\n/g, '<br>');
+}
+
 function addMessage(message, isUser = false, timestamp = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
     
+    // Special handling for welcome message
     if (!isUser && message.includes("Hello! I'm Lucky's AI assistant")) {
         messageDiv.className += ' welcome-message';
+        messageDiv.textContent = message;
+    } else {
+        // Format the message and set as HTML
+        const formattedMessage = isUser ? message : formatMessage(message);
+        
+        // Create message content container
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        if (isUser) {
+            contentDiv.textContent = formattedMessage;
+        } else {
+            contentDiv.innerHTML = formattedMessage;
+        }
+        
+        messageDiv.appendChild(contentDiv);
     }
-    
-    messageDiv.textContent = message;
     
     if (timestamp) {
         const timeSpan = document.createElement('span');
@@ -24,6 +67,11 @@ function addMessage(message, isUser = false, timestamp = null) {
     
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    
+    // Add animation class
+    setTimeout(() => {
+        messageDiv.classList.add('visible');
+    }, 10);
 }
 
 function showTypingIndicator() {
@@ -61,7 +109,11 @@ async function callGeminiAPI(prompt) {
                 parts: [{
                     text: prompt
                 }]
-            }]
+            }],
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 2048
+            }
         })
     });
 
@@ -96,7 +148,15 @@ async function sendMessage() {
     const typingIndicator = showTypingIndicator();
 
     try {
+        // Add a small delay to show typing indicator (min 1 second)
+        const startTime = Date.now();
         const response = await callGeminiAPI(message);
+        const elapsedTime = Date.now() - startTime;
+        
+        if (elapsedTime < 1000) {
+            await new Promise(resolve => setTimeout(resolve, 1000 - elapsedTime));
+        }
+        
         typingIndicator.remove();
         addMessage(response, false, timestamp);
     } catch (error) {
@@ -108,6 +168,11 @@ async function sendMessage() {
         messageInput.focus();
     }
 }
+
+// Add input event listener to enable/disable send button based on input
+messageInput.addEventListener('input', () => {
+    sendButton.disabled = messageInput.value.trim() === '';
+});
 
 sendButton.addEventListener('click', sendMessage);
 messageInput.addEventListener('keypress', (e) => {
