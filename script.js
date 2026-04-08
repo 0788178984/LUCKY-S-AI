@@ -1,4 +1,5 @@
-const API_KEY = "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"; // Replace with your API key
+const DEFAULT_API_KEY = "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";
+const API_KEY = localStorage.getItem("OPENROUTER_API_KEY") || DEFAULT_API_KEY;
 const API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL_NAME = "openai/gpt-4o-mini";
 
@@ -128,7 +129,10 @@ function buildFriendlyApiError(status, payload, retryAfterHeader) {
     }
 
     if (status === 401 || status === 403) {
-        return "API key is invalid or lacks permission. Verify key, project, and API access settings.";
+        const providerMessage = payload?.error?.message;
+        return providerMessage
+            ? `Authentication failed: ${providerMessage}`
+            : "API key is invalid, revoked, or lacks permission. Verify the key and model access.";
     }
 
     const apiMessage = payload?.error?.message;
@@ -203,11 +207,17 @@ async function callGeminiAPI(prompt) {
         return "I'm Lucky's AI assistant. I was created by Lucky to help you!";
     }
 
+    if (!API_KEY) {
+        throw new Error("No API key set. Run localStorage.setItem('OPENROUTER_API_KEY', 'sk-or-v1-...') and reload.");
+    }
+
     const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_KEY}`
+            'Authorization': `Bearer ${API_KEY}`,
+            'HTTP-Referer': window.location.origin || "https://localhost",
+            'X-Title': 'Asmart AI'
         },
         body: JSON.stringify({
             model: MODEL_NAME,
