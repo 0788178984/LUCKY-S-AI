@@ -1,4 +1,5 @@
 const API_URL = "/api/chat";
+const PUBLIC_FALLBACK_URL = "https://text.pollinations.ai";
 
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
@@ -211,40 +212,63 @@ async function callGeminiAPI(prompt) {
         return "I'm Lucky's AI assistant. I was created by Lucky to help you!";
     }
 
-    const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ prompt })
-    });
-
-    const rawText = await response.text();
-    let parsedBody = null;
     try {
-        parsedBody = rawText ? JSON.parse(rawText) : null;
-    } catch (parseError) {
-        parsedBody = null;
-    }
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ prompt })
+        });
 
-    if (response.ok) {
-        const responseText = parsedBody?.text || "";
-        if (!responseText) {
-            throw new Error("Empty response from model. Try again.");
+        const rawText = await response.text();
+        let parsedBody = null;
+        try {
+            parsedBody = rawText ? JSON.parse(rawText) : null;
+        } catch (parseError) {
+            parsedBody = null;
         }
-        return responseText
-            .replace(/Gemini/g, "Lucky")
-            .replace(/gemini/g, "Lucky")
-            .replace(/Google/g, "Lucky")
-            .replace(/google/g, "Lucky");
+
+        if (response.ok) {
+            const responseText = parsedBody?.text || "";
+            if (!responseText) {
+                throw new Error("Empty response from model. Try again.");
+            }
+            return responseText
+                .replace(/Gemini/g, "Lucky")
+                .replace(/gemini/g, "Lucky")
+                .replace(/Google/g, "Lucky")
+                .replace(/google/g, "Lucky");
+        }
+
+        const friendlyMessage = buildFriendlyApiError(
+            response.status,
+            parsedBody,
+            response.headers.get("retry-after")
+        );
+
+        // If protected backend auth fails, fallback to no-key public provider.
+        if (response.status !== 401 && response.status !== 403) {
+            throw new Error(friendlyMessage);
+        }
+    } catch (serverError) {
+        // Continue to public fallback below.
     }
 
-    const friendlyMessage = buildFriendlyApiError(
-        response.status,
-        parsedBody,
-        response.headers.get("retry-after")
+    const fallbackResponse = await fetch(
+        `${PUBLIC_FALLBACK_URL}/${encodeURIComponent(prompt)}`,
+        { method: "GET" }
     );
-    throw new Error(friendlyMessage);
+    const fallbackText = await fallbackResponse.text();
+    if (!fallbackResponse.ok || !fallbackText) {
+        throw new Error("Both secure API and fallback failed. Please try again later.");
+    }
+
+    return fallbackText
+        .replace(/Gemini/g, "Lucky")
+        .replace(/gemini/g, "Lucky")
+        .replace(/Google/g, "Lucky")
+        .replace(/google/g, "Lucky");
 }
 
 async function sendMessage() {
