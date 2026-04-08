@@ -157,7 +157,9 @@ function isInStandaloneMode() {
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js').catch(() => {
+            navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((registration) => {
+                registration.update();
+            }).catch(() => {
                 // Intentionally silent: app still works without offline support.
             });
         });
