@@ -1,7 +1,4 @@
-const DEFAULT_API_KEY = "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";
-const API_KEY = localStorage.getItem("OPENROUTER_API_KEY") || DEFAULT_API_KEY;
-const API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_NAME = "openai/gpt-4o-mini";
+const API_URL = "/api/chat";
 
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
@@ -135,6 +132,13 @@ function buildFriendlyApiError(status, payload, retryAfterHeader) {
             : "API key is invalid, revoked, or lacks permission. Verify the key and model access.";
     }
 
+    if (status === 404) {
+        const providerMessage = payload?.error?.message;
+        return providerMessage
+            ? `Model or route not found: ${providerMessage}`
+            : "Model or route not found. Trying another model may fix this.";
+    }
+
     const apiMessage = payload?.error?.message;
     return apiMessage
         ? `API Error (${status}): ${apiMessage}`
@@ -207,29 +211,12 @@ async function callGeminiAPI(prompt) {
         return "I'm Lucky's AI assistant. I was created by Lucky to help you!";
     }
 
-    if (!API_KEY) {
-        throw new Error("No API key set. Run localStorage.setItem('OPENROUTER_API_KEY', 'sk-or-v1-...') and reload.");
-    }
-
     const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${API_KEY}`,
-            'HTTP-Referer': window.location.origin || "https://localhost",
-            'X-Title': 'Asmart AI'
+            'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-            model: MODEL_NAME,
-            messages: [
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ],
-            temperature: 0.7,
-            max_tokens: 1024
-        })
+        body: JSON.stringify({ prompt })
     });
 
     const rawText = await response.text();
@@ -241,24 +228,23 @@ async function callGeminiAPI(prompt) {
     }
 
     if (response.ok) {
-        const result = parsedBody;
-        let responseText = result?.choices?.[0]?.message?.content || "";
+        const responseText = parsedBody?.text || "";
         if (!responseText) {
-            throw new Error("Empty response from model. Try a different prompt or model.");
+            throw new Error("Empty response from model. Try again.");
         }
         return responseText
             .replace(/Gemini/g, "Lucky")
             .replace(/gemini/g, "Lucky")
             .replace(/Google/g, "Lucky")
             .replace(/google/g, "Lucky");
-    } else {
-        const friendlyMessage = buildFriendlyApiError(
-            response.status,
-            parsedBody,
-            response.headers.get("retry-after")
-        );
-        throw new Error(friendlyMessage);
     }
+
+    const friendlyMessage = buildFriendlyApiError(
+        response.status,
+        parsedBody,
+        response.headers.get("retry-after")
+    );
+    throw new Error(friendlyMessage);
 }
 
 async function sendMessage() {
