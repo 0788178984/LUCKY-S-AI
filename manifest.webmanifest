@@ -1,0 +1,21 @@
+{
+  "name": "Asmart AI",
+  "short_name": "Asmart AI",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f8f9fc",
+  "theme_color": "#4a6bff",
+  "description": "Asmart AI mobile web app.",
+  "icons": [
+    {
+      "src": "logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

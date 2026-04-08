@@ -1,9 +1,14 @@
-const API_KEY = "AIzaSyAAJ06nHdpAc3DdCoHXCrJ8_5izL8jO4bc"; // Replace with your API key
-const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const API_KEY = "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"; // Replace with your API key
+const API_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL_NAME = "openai/gpt-4o-mini";
 
 const messageInput = document.getElementById('message-input');
 const sendButton = document.getElementById('send-button');
 const chatMessages = document.getElementById('chat-messages');
+const installAppButton = document.getElementById('install-app-button');
+const RATE_LIMIT_DOCS_URL = "https://openrouter.ai/docs/limits";
+const USAGE_DASHBOARD_URL = "https://openrouter.ai/settings/credits";
+let deferredInstallPrompt = null;
 
 // Load showdown for markdown support
 const converter = typeof showdown !== 'undefined' ? new showdown.Converter({
@@ -87,6 +92,106 @@ function showTypingIndicator() {
     return indicator;
 }
 
+function extractRetryDelaySeconds(errorPayload, retryAfterHeader) {
+    if (retryAfterHeader && !Number.isNaN(Number(retryAfterHeader))) {
+        return Number(retryAfterHeader);
+    }
+
+    const retryDelay = errorPayload?.error?.details?.find(
+        detail => detail?.["@type"] === "type.googleapis.com/google.rpc.RetryInfo"
+    )?.retryDelay;
+
+    if (typeof retryDelay === "string" && retryDelay.endsWith("s")) {
+        const seconds = Number(retryDelay.slice(0, -1));
+        if (!Number.isNaN(seconds)) {
+            return Math.ceil(seconds);
+        }
+    }
+
+    return null;
+}
+
+function buildFriendlyApiError(status, payload, retryAfterHeader) {
+    if (status === 429) {
+        const retrySeconds = extractRetryDelaySeconds(payload, retryAfterHeader);
+        const retryText = retrySeconds
+            ? `Try again in about ${retrySeconds} seconds.`
+            : "Please wait a bit and try again.";
+
+        return [
+            "Rate or credit limit reached for this API key/project.",
+            retryText,
+            `Check limits: ${RATE_LIMIT_DOCS_URL}`,
+            `Usage dashboard: ${USAGE_DASHBOARD_URL}`,
+            "If balance is 0, top up credits or use a different key."
+        ].join(" ");
+    }
+
+    if (status === 401 || status === 403) {
+        return "API key is invalid or lacks permission. Verify key, project, and API access settings.";
+    }
+
+    const apiMessage = payload?.error?.message;
+    return apiMessage
+        ? `API Error (${status}): ${apiMessage}`
+        : `API Error (${status}). Please try again.`;
+}
+
+function isIOSDevice() {
+    return /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+}
+
+function isInStandaloneMode() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
+function registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(() => {
+                // Intentionally silent: app still works without offline support.
+            });
+        });
+    }
+}
+
+function setupInstallPrompt() {
+    if (!installAppButton) return;
+
+    if (isInStandaloneMode()) {
+        installAppButton.hidden = true;
+        return;
+    }
+
+    window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault();
+        deferredInstallPrompt = event;
+        installAppButton.hidden = false;
+    });
+
+    installAppButton.addEventListener('click', async () => {
+        if (deferredInstallPrompt) {
+            deferredInstallPrompt.prompt();
+            await deferredInstallPrompt.userChoice;
+            deferredInstallPrompt = null;
+            installAppButton.hidden = true;
+            return;
+        }
+
+        if (isIOSDevice()) {
+            addMessage("To install on iPhone/iPad: tap Share, then choose 'Add to Home Screen'.", false);
+        }
+    });
+
+    window.addEventListener('appinstalled', () => {
+        installAppButton.hidden = true;
+    });
+
+    if (isIOSDevice()) {
+        installAppButton.hidden = false;
+    }
+}
+
 async function callGeminiAPI(prompt) {
     const identityKeywords = [
         "who made you", "who created you", "who developed you",
@@ -102,31 +207,47 @@ async function callGeminiAPI(prompt) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': API_KEY
+            'Authorization': `Bearer ${API_KEY}`
         },
         body: JSON.stringify({
-            contents: [{
-                parts: [{
-                    text: prompt
-                }]
-            }],
-            generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 2048
-            }
+            model: MODEL_NAME,
+            messages: [
+                {
+                    role: "user",
+                    content: prompt
+                }
+            ],
+            temperature: 0.7,
+            max_tokens: 1024
         })
     });
 
+    const rawText = await response.text();
+    let parsedBody = null;
+    try {
+        parsedBody = rawText ? JSON.parse(rawText) : null;
+    } catch (parseError) {
+        parsedBody = null;
+    }
+
     if (response.ok) {
-        const result = await response.json();
-        let responseText = result.candidates[0].content.parts[0].text;
+        const result = parsedBody;
+        let responseText = result?.choices?.[0]?.message?.content || "";
+        if (!responseText) {
+            throw new Error("Empty response from model. Try a different prompt or model.");
+        }
         return responseText
             .replace(/Gemini/g, "Lucky")
             .replace(/gemini/g, "Lucky")
             .replace(/Google/g, "Lucky")
             .replace(/google/g, "Lucky");
     } else {
-        throw new Error(`API Error: ${response.status} - ${await response.text()}`);
+        const friendlyMessage = buildFriendlyApiError(
+            response.status,
+            parsedBody,
+            response.headers.get("retry-after")
+        );
+        throw new Error(friendlyMessage);
     }
 }
 
@@ -184,6 +305,8 @@ messageInput.addEventListener('keypress', (e) => {
 });
 
 messageInput.focus();
+registerServiceWorker();
+setupInstallPrompt();
 
 // Add initial welcome message
 window.addEventListener('load', () => {
